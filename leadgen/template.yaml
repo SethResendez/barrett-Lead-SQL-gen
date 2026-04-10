@@ -1,0 +1,95 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Barrett Financial Lead Gen Pipeline
+
+Globals:
+  Function:
+    Runtime: nodejs18.x
+    Timeout: 30
+    Environment:
+      Variables:
+        CLAUDE_API_KEY: !Ref ClaudeApiKey
+        AZURE_TENANT_ID: !Ref AzureTenantId
+        AZURE_CLIENT_ID: !Ref AzureClientId
+        AZURE_CLIENT_SECRET: !Ref AzureClientSecret
+
+Parameters:
+  ClaudeApiKey:
+    Type: String
+    NoEcho: true
+  AzureTenantId:
+    Type: String
+    NoEcho: true
+  AzureClientId:
+    Type: String
+    NoEcho: true
+  AzureClientSecret:
+    Type: String
+    NoEcho: true
+
+Resources:
+
+  LeadGenApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      Cors:
+        AllowMethods: "'POST,OPTIONS'"
+        AllowHeaders: "'Content-Type'"
+        AllowOrigin: "'*'"
+
+  GenerateSQLFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambda/generate-sql/
+      Handler: index.handler
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref LeadGenApi
+            Path: /generate-sql
+            Method: post
+
+  RefineSQLFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambda/refine-sql/
+      Handler: index.handler
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref LeadGenApi
+            Path: /refine-sql
+            Method: post
+
+  SaveSessionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambda/sharepoint/
+      Handler: index.handler
+      Events:
+        Save:
+          Type: Api
+          Properties:
+            RestApiId: !Ref LeadGenApi
+            Path: /save-session
+            Method: post
+        Load:
+          Type: Api
+          Properties:
+            RestApiId: !Ref LeadGenApi
+            Path: /load-sessions
+            Method: post
+        Delete:
+          Type: Api
+          Properties:
+            RestApiId: !Ref LeadGenApi
+            Path: /delete-session
+            Method: post
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway URL
+    Value: !Sub 'https://${LeadGenApi}.execute-api.${AWS::Region}.amazonaws.com/prod'

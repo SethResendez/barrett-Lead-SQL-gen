@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Lead Gen Pipeline — Barrett Financial</title>
+<link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="topbar-logo">Barrett Financial</span>
+      <span class="topbar-divider">|</span>
+      <span class="topbar-title">Lead Gen Pipeline</span>
+    </div>
+    <div class="topbar-right">
+      <span id="top-session-label" class="session-label">No active session</span>
+      <button class="btn btn-sm" onclick="showSessions()">Sessions</button>
+      <button class="btn btn-sm btn-primary" onclick="newSession()">+ New</button>
+    </div>
+  </header>
+
+  <!-- SUMMARY BAR -->
+  <div class="summary-bar" id="summary-bar" style="display:none;">
+    <div class="summary-bar-top">
+      <span class="summary-bar-title">Session summary</span>
+      <div id="stage-progress" class="stage-progress"></div>
+    </div>
+    <div class="summary-grid" id="summary-grid"></div>
+  </div>
+
+  <main class="main">
+
+    <!-- SESSIONS DRAWER -->
+    <div id="sessions-panel" class="card" style="display:none;">
+      <div class="card-header">
+        <span class="card-label">Saved sessions</span>
+        <button class="btn btn-sm" onclick="hideSessions()">Close</button>
+      </div>
+      <div id="sessions-list"><p class="muted">Loading...</p></div>
+    </div>
+
+    <!-- STAGE NAV -->
+    <nav class="stage-nav">
+      <button class="stage-btn active" data-stage="0" onclick="goStage(0)"><span class="stage-num">1</span><span>Request</span></button>
+      <button class="stage-btn" data-stage="1" onclick="goStage(1)"><span class="stage-num">2</span><span>SQL</span></button>
+      <button class="stage-btn" data-stage="2" onclick="goStage(2)"><span class="stage-num">3</span><span>Raw Output</span></button>
+      <button class="stage-btn" data-stage="3" onclick="goStage(3)"><span class="stage-num">4</span><span>Skip Trace</span></button>
+      <button class="stage-btn" data-stage="4" onclick="goStage(4)"><span class="stage-num">5</span><span>Export</span></button>
+    </nav>
+
+    <!-- STAGE 1: REQUEST -->
+    <section class="step-section visible" id="stage-0">
+      <div class="card">
+        <div class="card-label">Session info</div>
+        <div class="grid-2">
+          <div class="field">
+            <label>Loan officer name</label>
+            <input type="text" id="lo-name" placeholder="e.g. Mike Johnson"/>
+          </div>
+          <div class="field">
+            <label>List name</label>
+            <input type="text" id="list-label" placeholder="e.g. Distressed NOO — Anoka"/>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-label">Request input</div>
+        <div class="mode-toggle">
+          <button class="btn btn-sm active-mode" id="mode-paste" onclick="setMode('paste')">Paste Excel row</button>
+          <button class="btn btn-sm" id="mode-free" onclick="setMode('free')">Free-form description</button>
+        </div>
+        <p class="hint" id="mode-hint">Paste a row from your Excel tracker (tab-separated)</p>
+        <textarea id="request-input" rows="4" placeholder="Paste Excel row here..."></textarea>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="generateSQL()">Generate SQL</button>
+        </div>
+        <div id="s1-loading" class="loading" style="display:none;"><div class="spinner"></div>Generating SQL...</div>
+        <div id="s1-error" class="error-msg" style="display:none;"></div>
+      </div>
+    </section>
+
+    <!-- STAGE 2: SQL -->
+    <section class="step-section" id="stage-1">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-header-left">
+            <span class="card-label" style="margin:0;">Current SQL</span>
+            <span class="badge badge-info" id="ver-label">v1</span>
+          </div>
+          <button class="btn btn-sm" id="copy-sql-btn" onclick="copySQL()">Copy SQL</button>
+        </div>
+        <pre class="sql-block" id="sql-display">—</pre>
+      </div>
+      <div class="card">
+        <div class="card-label">Log count + request changes</div>
+        <div class="grid-2">
+          <div class="field">
+            <label>Snowflake count</label>
+            <input type="number" id="count-input" placeholder="e.g. 4200"/>
+          </div>
+          <div class="field">
+            <label>Change request (or type "approve")</label>
+            <input type="text" id="change-input" placeholder='Describe change or type "approve"'/>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="submitChange()">Submit</button>
+        </div>
+        <div id="s2-loading" class="loading" style="display:none;"><div class="spinner"></div>Refining query...</div>
+        <div id="s2-error" class="error-msg" style="display:none;"></div>
+      </div>
+      <div class="card" id="ver-history-card" style="display:none;">
+        <div class="card-label">Version history</div>
+        <div id="ver-list"></div>
+      </div>
+      <div class="card success-banner" id="approved-banner" style="display:none;">
+        <div class="banner-inner">
+          <span>Query approved — ready for Snowflake</span>
+          <button class="btn btn-success btn-sm" onclick="goStage(2)">Next: raw output →</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- STAGE 3: RAW OUTPUT -->
+    <section class="step-section" id="stage-2">
+      <div class="card">
+        <div class="card-label">Raw Snowflake output</div>
+        <p class="hint">Paste the CSV/TSV export from Snowflake with headers. The tool strips it down to address-only for BatchData.</p>
+        <textarea id="raw-output" rows="6" placeholder="Paste raw CSV/TSV from Snowflake..."></textarea>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="processRaw()">Process</button>
+        </div>
+        <div id="s3-loading" class="loading" style="display:none;"><div class="spinner"></div>Parsing...</div>
+        <div id="s3-error" class="error-msg" style="display:none;"></div>
+      </div>
+      <div id="st-preview" class="card" style="display:none;">
+        <div class="card-header">
+          <div class="card-header-left">
+            <span class="card-label" style="margin:0;">BatchData input ready</span>
+            <span class="badge badge-neutral" id="st-count-badge">0 records</span>
+          </div>
+          <button class="btn btn-sm" id="copy-st-btn" onclick="copySkipTrace()">Copy list</button>
+        </div>
+        <pre class="sql-block" id="st-display" style="max-height:140px;"></pre>
+        <div class="btn-row">
+          <button class="btn btn-success btn-sm" onclick="goStage(3)">Next: paste skip trace →</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- STAGE 4: SKIP TRACE -->
+    <section class="step-section" id="stage-3">
+      <div class="card">
+        <div class="card-label">BatchData result</div>
+        <p class="hint">Paste the CSV output from BatchData. Pulls <code>phoneNumbers.0</code> and <code>emails.0</code> only — highest confidence contacts.</p>
+        <textarea id="st-input" rows="6" placeholder="Paste BatchData CSV output..."></textarea>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="processSkipTrace()">Process skip trace</button>
+        </div>
+        <div id="s4-loading" class="loading" style="display:none;"><div class="spinner"></div>Merging...</div>
+        <div id="s4-error" class="error-msg" style="display:none;"></div>
+      </div>
+      <div id="st-merged" class="card" style="display:none;">
+        <div class="stats-row">
+          <div class="stat-card"><div class="stat-val" id="mc">—</div><div class="stat-lbl">Total records</div></div>
+          <div class="stat-card"><div class="stat-val" id="pc">—</div><div class="stat-lbl">With phone</div></div>
+          <div class="stat-card"><div class="stat-val" id="ec">—</div><div class="stat-lbl">With email</div></div>
+          <div class="stat-card"><div class="stat-val" id="dc">—</div><div class="stat-lbl">DNC flagged</div></div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-success btn-sm" onclick="goStage(4)">Next: build export →</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- STAGE 5: EXPORT -->
+    <section class="step-section" id="stage-4">
+      <div class="card">
+        <div class="card-label">Base fields (always included)</div>
+        <p class="hint">Name · Address (slug) · Phone (index 0) · Email (index 0) · DNC flag</p>
+      </div>
+      <div class="card">
+        <div class="card-label">Additional Snowflake fields</div>
+        <p class="hint" style="margin-bottom:10px;">Select any extra columns from the Snowflake data to append after base fields.</p>
+        <div class="field-grid" id="field-grid"></div>
+        <div class="divider"></div>
+        <div class="custom-field-row">
+          <input type="text" id="custom-col" placeholder="Add custom column name..."/>
+          <button class="btn btn-sm" onclick="addCustomField()">+ Add</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-label">Build export</div>
+        <div id="export-loading" class="loading" style="display:none;"><div class="spinner"></div>Building Excel...</div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="buildExport()">Build contact Excel</button>
+        </div>
+        <div id="export-result" style="display:none;margin-top:12px;">
+          <p class="success-text">File ready</p>
+          <button class="btn btn-success" onclick="downloadExcel()">Download Excel</button>
+        </div>
+        <div id="export-error" class="error-msg" style="display:none;"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
