@@ -1,25 +1,28 @@
-const AWS = require('aws-sdk');
-const s3 = new AWS.S3();
+const { S3Client, GetObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
+
+const s3 = new S3Client({});
 const BUCKET = process.env.SESSIONS_BUCKET;
 const KEY = 'sessions/sessions.json';
 
 async function readSessions() {
   try {
-    const r = await s3.getObject({ Bucket: BUCKET, Key: KEY }).promise();
-    return JSON.parse(r.Body.toString());
+    const r = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: KEY }));
+    const chunks = [];
+    for await (const chunk of r.Body) chunks.push(chunk);
+    return JSON.parse(Buffer.concat(chunks).toString());
   } catch (e) {
-    if (e.code === 'NoSuchKey') return { sessions: [] };
+    if (e.name === 'NoSuchKey') return { sessions: [] };
     throw e;
   }
 }
 
 async function writeSessions(data) {
-  await s3.putObject({
+  await s3.send(new PutObjectCommand({
     Bucket: BUCKET,
     Key: KEY,
     Body: JSON.stringify(data, null, 2),
     ContentType: 'application/json'
-  }).promise();
+  }));
 }
 
 exports.handler = async (event) => {
