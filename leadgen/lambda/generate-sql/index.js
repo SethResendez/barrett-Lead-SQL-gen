@@ -11,6 +11,9 @@ Rules:
 - PROPENSITY_SELL_PERCENTILE_ZIP and PROPENSITY_REFINANCE_PERCENTILE_ZIP must always appear in the output; using SELECT * satisfies this
 - No computed columns or aliases before the WHERE clause
 - No markdown fences, no explanation — return ONLY the SQL query
+- OWNER_OCCUPIED_YN and DEFAULT_YN store string values 'Y' or 'N' — never use 1, 0, TRUE, FALSE, or NULL checks for these fields; always filter with ILIKE e.g. OWNER_OCCUPIED_YN ILIKE 'Y'
+- For all single-value string comparisons use ILIKE instead of = or IN — e.g. LIEN1_LOAN_TYPE ILIKE 'Conventional' not LIEN1_LOAN_TYPE = 'Conventional'
+- Use IN (...) only for multi-value lists like COUNTY IN ('Hennepin', 'Anoka')
 - If input is a pasted Excel row (tab-separated), parse the values as a lead request form
 - If free-form, interpret intent and build appropriate filters`;
 
