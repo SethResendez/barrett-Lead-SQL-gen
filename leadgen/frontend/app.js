@@ -91,6 +91,20 @@ function toStorable() {
   };
 }
 
+function showSaveError(msg) {
+  let el = document.getElementById('save-error-toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'save-error-toast';
+    el.style.cssText = 'position:fixed;bottom:16px;right:16px;background:#c0392b;color:#fff;padding:10px 16px;border-radius:6px;font-size:13px;z-index:9999;max-width:360px;';
+    document.body.appendChild(el);
+  }
+  el.textContent = 'Save failed: ' + msg;
+  el.style.display = 'block';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.style.display = 'none'; }, 6000);
+}
+
 async function save() {
   if (!S.id) return;
   S.updatedAt = ts();
@@ -99,6 +113,7 @@ async function save() {
     updateSummary();
   } catch (e) {
     console.error('Save failed:', e);
+    showSaveError(e.message);
   }
 }
 
@@ -371,8 +386,23 @@ function fmtSQL(sql) {
   }
 }
 
+function copyToClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    return navigator.clipboard.writeText(text);
+  }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try { document.execCommand('copy'); } catch (e) {}
+  document.body.removeChild(ta);
+  return Promise.resolve();
+}
+
 function copySQL() {
-  navigator.clipboard.writeText(fmtSQL(S.versions[S.versions.length - 1].sql));
+  copyToClipboard(fmtSQL(S.versions[S.versions.length - 1].sql));
   const btn = document.getElementById('copy-sql-btn');
   btn.textContent = 'Copied!';
   setTimeout(() => btn.textContent = 'Copy SQL', 1500);
@@ -461,7 +491,7 @@ function processRaw() {
 }
 
 function copySkipTrace() {
-  navigator.clipboard.writeText(S.skipHeadersCSV);
+  copyToClipboard(S.skipHeadersCSV);
   const btn = document.getElementById('copy-st-btn');
   btn.textContent = 'Copied!';
   setTimeout(() => btn.textContent = 'Copy list', 1500);

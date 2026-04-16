@@ -6,7 +6,7 @@ const CLIENT_ID   = process.env.AZURE_CLIENT_ID;
 const CLIENT_SECRET = process.env.AZURE_CLIENT_SECRET;
 const SITE_HOSTNAME = 'barrettfinancial.sharepoint.com';
 const SITE_PATH   = '/sites/BusinessIntelligence';
-const FILE_PATH   = '/Files/10. Leads/10. Claude/Lead Gen Pipeline.xlsx';
+const FILE_PATH   = '/10. Leads/10. Claude/Lead Gen Pipeline.xlsx';
 
 // ─── HTTP HELPER ─────────────────────────────────────────────────────────────
 function httpRequest(options, body) {
