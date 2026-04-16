@@ -9,21 +9,9 @@ Globals:
     Environment:
       Variables:
         CLAUDE_API_KEY: !Ref ClaudeApiKey
-        AZURE_TENANT_ID: !Ref AzureTenantId
-        AZURE_CLIENT_ID: !Ref AzureClientId
-        AZURE_CLIENT_SECRET: !Ref AzureClientSecret
 
 Parameters:
   ClaudeApiKey:
-    Type: String
-    NoEcho: true
-  AzureTenantId:
-    Type: String
-    NoEcho: true
-  AzureClientId:
-    Type: String
-    NoEcho: true
-  AzureClientSecret:
     Type: String
     NoEcho: true
 
@@ -69,6 +57,12 @@ Resources:
     Properties:
       CodeUri: lambda/sharepoint/
       Handler: index.handler
+      Environment:
+        Variables:
+          SESSIONS_BUCKET: barrett-leadgen
+      Policies:
+        - S3CrudPolicy:
+            BucketName: barrett-leadgen
       Events:
         Save:
           Type: Api

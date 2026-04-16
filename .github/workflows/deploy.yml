@@ -59,10 +59,7 @@ jobs:
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
             --parameter-overrides \
-              ClaudeApiKey="${{ secrets.CLAUDE_API_KEY }}" \
-              AzureTenantId="${{ secrets.AZURE_TENANT_ID }}" \
-              AzureClientId="${{ secrets.AZURE_CLIENT_ID }}" \
-              AzureClientSecret="${{ secrets.AZURE_CLIENT_SECRET }}"
+              ClaudeApiKey="${{ secrets.CLAUDE_API_KEY }}"
 
       - name: Inject API URL and upload frontend
         run: |
