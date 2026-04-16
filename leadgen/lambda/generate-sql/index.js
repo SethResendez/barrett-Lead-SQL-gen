@@ -4,18 +4,27 @@ const SYSTEM_PROMPT = `You are a Snowflake SQL expert for Barrett Financial's Ho
 Table: BULK_PROPERTY_DATA_WITH_PROPENSITY_PRIVATE_SHARE_USA
 Key fields: HC_ADDRESS_ID, ADDRESS_SLUG, ADDRESS, CITY, STATE, ZIPCODE, COUNTY, HC_VALUE_ESTIMATE, PRINCIPAL_OUTSTANDING_TOTAL, LIEN_AMOUNT_TOTAL, PRINCIPAL_PAID_TOTAL, OWNER_OCCUPIED_YN, DEFAULT_YN, DEFAULT_DATE_LAST, HC_CONDITION_CLASS, BUILDING_CONDITION_CODE, LAST_CLOSE_DATE, LAST_CLOSE_PRICE, DEED_DATE, DEED_PRICE, LIEN1_LOAN_TYPE, LIEN1_AMOUNT, LIEN1_CONTRACT_DATE, LIEN1_LOAN_TERM, LIEN1_INTEREST_RATE_USED, LIEN1_LENDER_NAME, LIEN1_BORROWER1_NAME, LIEN1_BORROWER2_NAME, YEAR_BUILT, LIVING_AREA, LOT_SIZE, PROPERTY_TYPE, BEDROOMS, BATHROOMS_TOTAL, OWNER_NAME, PROPENSITY_SELL_PERCENTILE_ZIP, PROPENSITY_REFINANCE_PERCENTILE_ZIP
 
-The 13 MN county scope: Mille Lacs, Kanabec, Isanti, Chisago, Sherburne, Anoka, Hennepin, Ramsey, Washington, Dakota, Scott, Carver, Wright — use COUNTY IN (...) when targeting these.
-
-Rules:
-- Always write SELECT * FROM BULK_PROPERTY_DATA_WITH_PROPENSITY_PRIVATE_SHARE_USA WHERE ... SQL — never use a named column list
-- PROPENSITY_SELL_PERCENTILE_ZIP and PROPENSITY_REFINANCE_PERCENTILE_ZIP must always appear in the output; using SELECT * satisfies this
-- No computed columns or aliases before the WHERE clause
-- No markdown fences, no explanation — return ONLY the SQL query
-- OWNER_OCCUPIED_YN and DEFAULT_YN store string values 'Y' or 'N' — never use 1, 0, TRUE, FALSE, or NULL checks for these fields; always filter with ILIKE e.g. OWNER_OCCUPIED_YN ILIKE 'Y'
-- For all single-value string comparisons use ILIKE instead of = or IN — e.g. LIEN1_LOAN_TYPE ILIKE 'Conventional' not LIEN1_LOAN_TYPE = 'Conventional'
-- Use IN (...) only for multi-value lists like COUNTY IN ('Hennepin', 'Anoka')
+STYLE RULES — follow exactly, no exceptions:
+- Return ONLY the SQL query. No markdown fences, no explanation, no preamble.
+- Always SELECT * FROM BULK_PROPERTY_DATA_WITH_PROPENSITY_PRIVATE_SHARE_USA WHERE ... LIMIT 10000;
+- Always end with LIMIT 10000;
+- Always include: AND NOT LIEN1_LENDER_NAME ILIKE '%BARRETT FINANCIAL GROUP%'
+- All string comparisons use ILIKE with % wildcards on both sides: ILIKE '%value%'
+- Multiple values for the same field use OR inside parentheses:
+    ( LIEN1_LOAN_TYPE ILIKE '%VA%'
+      OR LIEN1_LOAN_TYPE ILIKE '%FHA%'
+      OR LIEN1_LOAN_TYPE ILIKE '%CONVENTIONAL%' )
+- Numeric ranges use >= and <= inside parentheses:
+    (LIEN1_INTEREST_RATE_USED >= 6.250 AND LIEN1_INTEREST_RATE_USED <= 9.000)
+- Date ranges use BETWEEN:
+    LIEN1_CONTRACT_DATE BETWEEN '2021-09-01' AND '2025-07-31'
+- Owner occupied YES: NOT OWNER_OCCUPIED_YN IS NULL
+- Owner occupied NO (non-owner): OWNER_OCCUPIED_YN IS NULL
+- Dollar equity: (HC_VALUE_ESTIMATE - LIEN1_PRINCIPAL_OUTSTANDING) > amount
+- Percent equity: ROUND(((HC_VALUE_ESTIMATE - LIEN1_PRINCIPAL_OUTSTANDING) / NULLIF(HC_VALUE_ESTIMATE, 0)) * 100, 2) >= percent
+- The 13 MN county scope: Mille Lacs, Kanabec, Isanti, Chisago, Sherburne, Anoka, Hennepin, Ramsey, Washington, Dakota, Scott, Carver, Wright — use COUNTY IN (...) when targeting these
 - If input is a pasted Excel row (tab-separated), parse the values as a lead request form
-- If free-form, interpret intent and build appropriate filters`;
+- If free-form, interpret intent and build appropriate filters matching the style above`;
 
 function ensurePropensityCols(sql) {
   const trimmed = sql.trim();
