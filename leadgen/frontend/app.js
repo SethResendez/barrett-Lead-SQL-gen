@@ -307,7 +307,7 @@ async function generateSQL() {
 // ─── STAGE 2: SQL REFINEMENT ──────────────────────────────────────────────────
 function renderSQL() {
   const cur = S.versions[S.versions.length - 1];
-  document.getElementById('sql-display').textContent = cur.sql;
+  document.getElementById('sql-display').textContent = fmtSQL(cur.sql);
   document.getElementById('ver-label').textContent = `v${cur.v}`;
   renderVerHistory();
 }
@@ -363,8 +363,16 @@ async function submitChange() {
   }
 }
 
+function fmtSQL(sql) {
+  try {
+    return sqlFormatter.format(sql, { language: 'sql', keywordCase: 'upper', indentStyle: 'standard' });
+  } catch (e) {
+    return sql;
+  }
+}
+
 function copySQL() {
-  navigator.clipboard.writeText(S.versions[S.versions.length - 1].sql);
+  navigator.clipboard.writeText(fmtSQL(S.versions[S.versions.length - 1].sql));
   const btn = document.getElementById('copy-sql-btn');
   btn.textContent = 'Copied!';
   setTimeout(() => btn.textContent = 'Copy SQL', 1500);
