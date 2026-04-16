@@ -1,11 +1,23 @@
 const https = require('https');
 
+function ensurePropensityCols(sql) {
+  const trimmed = sql.trim();
+  if (/^SELECT\s+\*/i.test(trimmed)) return trimmed;
+  const hasSell = /PROPENSITY_SELL_PERCENTILE_ZIP/i.test(trimmed);
+  const hasRefi = /PROPENSITY_REFINANCE_PERCENTILE_ZIP/i.test(trimmed);
+  if (hasSell && hasRefi) return trimmed;
+  const cols = [];
+  if (!hasSell) cols.push('PROPENSITY_SELL_PERCENTILE_ZIP');
+  if (!hasRefi) cols.push('PROPENSITY_REFINANCE_PERCENTILE_ZIP');
+  return trimmed.replace(/^(SELECT\s+)/i, `$1${cols.join(', ')}, `);
+}
+
 function claudeRequest(messages) {
   return new Promise((resolve, reject) => {
     const body = JSON.stringify({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1000,
-      system: 'You are a Snowflake SQL expert. Given an existing SQL query and a change request, return ONLY the updated SQL query. No explanation, no markdown fences, no preamble.',
+      system: 'You are a Snowflake SQL expert. Given an existing SQL query and a change request, return ONLY the updated SQL query. No explanation, no markdown fences, no preamble. Always preserve SELECT * if the original uses it. Never remove PROPENSITY_SELL_PERCENTILE_ZIP or PROPENSITY_REFINANCE_PERCENTILE_ZIP from the output.',
       messages
     });
     const options = {
@@ -47,7 +59,7 @@ exports.handler = async (event) => {
       role: 'user',
       content: `Existing SQL:\n${sql}\n\nChange requested: ${change}`
     }]);
-    const newSQL = result.content?.[0]?.text || '';
+    const newSQL = ensurePropensityCols(result.content?.[0]?.text || '');
     return { statusCode: 200, headers, body: JSON.stringify({ sql: newSQL }) };
   } catch (e) {
     return { statusCode: 500, headers, body: JSON.stringify({ error: e.message }) };

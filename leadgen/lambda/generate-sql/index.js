@@ -2,16 +2,29 @@ const https = require('https');
 
 const SYSTEM_PROMPT = `You are a Snowflake SQL expert for Barrett Financial's HouseCanary property database.
 Table: bulk_property_data_private_share_usa
-Key fields: HC_ADDRESS_ID, ADDRESS_SLUG, ADDRESS, CITY, STATE, ZIPCODE, COUNTY, HC_VALUE_ESTIMATE, PRINCIPAL_OUTSTANDING_TOTAL, LIEN_AMOUNT_TOTAL, PRINCIPAL_PAID_TOTAL, OWNER_OCCUPIED_YN, DEFAULT_YN, DEFAULT_DATE_LAST, HC_CONDITION_CLASS, BUILDING_CONDITION_CODE, LAST_CLOSE_DATE, LAST_CLOSE_PRICE, DEED_DATE, DEED_PRICE, LIEN1_LOAN_TYPE, LIEN1_AMOUNT, LIEN1_CONTRACT_DATE, LIEN1_LOAN_TERM, LIEN1_INTEREST_RATE_USED, LIEN1_LENDER_NAME, LIEN1_BORROWER1_NAME, LIEN1_BORROWER2_NAME, YEAR_BUILT, LIVING_AREA, LOT_SIZE, PROPERTY_TYPE, BEDROOMS, BATHROOMS_TOTAL, OWNER_NAME
+Key fields: HC_ADDRESS_ID, ADDRESS_SLUG, ADDRESS, CITY, STATE, ZIPCODE, COUNTY, HC_VALUE_ESTIMATE, PRINCIPAL_OUTSTANDING_TOTAL, LIEN_AMOUNT_TOTAL, PRINCIPAL_PAID_TOTAL, OWNER_OCCUPIED_YN, DEFAULT_YN, DEFAULT_DATE_LAST, HC_CONDITION_CLASS, BUILDING_CONDITION_CODE, LAST_CLOSE_DATE, LAST_CLOSE_PRICE, DEED_DATE, DEED_PRICE, LIEN1_LOAN_TYPE, LIEN1_AMOUNT, LIEN1_CONTRACT_DATE, LIEN1_LOAN_TERM, LIEN1_INTEREST_RATE_USED, LIEN1_LENDER_NAME, LIEN1_BORROWER1_NAME, LIEN1_BORROWER2_NAME, YEAR_BUILT, LIVING_AREA, LOT_SIZE, PROPERTY_TYPE, BEDROOMS, BATHROOMS_TOTAL, OWNER_NAME, PROPENSITY_SELL_PERCENTILE_ZIP, PROPENSITY_REFINANCE_PERCENTILE_ZIP
 
 The 13 MN county scope: Mille Lacs, Kanabec, Isanti, Chisago, Sherburne, Anoka, Hennepin, Ramsey, Washington, Dakota, Scott, Carver, Wright — use COUNTY IN (...) when targeting these.
 
 Rules:
-- Write clean SELECT * FROM bulk_property_data_private_share_usa WHERE ... SQL
+- Always write SELECT * FROM bulk_property_data_private_share_usa WHERE ... SQL — never use a named column list
+- PROPENSITY_SELL_PERCENTILE_ZIP and PROPENSITY_REFINANCE_PERCENTILE_ZIP must always appear in the output; using SELECT * satisfies this
 - No computed columns or aliases before the WHERE clause
 - No markdown fences, no explanation — return ONLY the SQL query
 - If input is a pasted Excel row (tab-separated), parse the values as a lead request form
 - If free-form, interpret intent and build appropriate filters`;
+
+function ensurePropensityCols(sql) {
+  const trimmed = sql.trim();
+  if (/^SELECT\s+\*/i.test(trimmed)) return trimmed;
+  const hasSell = /PROPENSITY_SELL_PERCENTILE_ZIP/i.test(trimmed);
+  const hasRefi = /PROPENSITY_REFINANCE_PERCENTILE_ZIP/i.test(trimmed);
+  if (hasSell && hasRefi) return trimmed;
+  const cols = [];
+  if (!hasSell) cols.push('PROPENSITY_SELL_PERCENTILE_ZIP');
+  if (!hasRefi) cols.push('PROPENSITY_REFINANCE_PERCENTILE_ZIP');
+  return trimmed.replace(/^(SELECT\s+)/i, `$1${cols.join(', ')}, `);
+}
 
 function claudeRequest(messages) {
   return new Promise((resolve, reject) => {
@@ -60,7 +73,7 @@ exports.handler = async (event) => {
       ? `Generate SQL for this pasted Excel row request:\n\n${request}`
       : `Generate SQL for this lead list description:\n\n${request}`;
     const result = await claudeRequest([{ role: 'user', content: prompt }]);
-    const sql = result.content?.[0]?.text || '';
+    const sql = ensurePropensityCols(result.content?.[0]?.text || '');
     return { statusCode: 200, headers, body: JSON.stringify({ sql }) };
   } catch (e) {
     return { statusCode: 500, headers, body: JSON.stringify({ error: e.message }) };

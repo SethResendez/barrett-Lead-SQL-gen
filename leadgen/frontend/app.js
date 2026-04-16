@@ -33,7 +33,7 @@ function newStateObj() {
     rawRecords: [], skipHeadersCSV: '', rawCount: 0,
     mergedRecords: [], mergedCount: 0, phoneCount: 0, emailCount: 0, dncCount: 0,
     selectedFields: new Set(), customFields: [],
-    excelData: null, completedStages: new Set(),
+    excelData: null, propensityStats: null, completedStages: new Set(),
     createdAt: null, updatedAt: null
   };
 }
@@ -247,6 +247,10 @@ function updateSummary() {
     { label: 'With phone', val: S.phoneCount ? S.phoneCount.toLocaleString() : '—' },
     { label: 'With email', val: S.emailCount ? S.emailCount.toLocaleString() : '—' },
     { label: 'DNC flagged', val: S.dncCount ? S.dncCount.toLocaleString() : '—' },
+    ...(S.propensityStats && S.propensityStats.hasData ? [
+      { label: 'Avg sell propensity', val: S.propensityStats.sellAvg !== null ? S.propensityStats.sellAvg : '—', cls: 'blue' },
+      { label: 'Avg refi propensity', val: S.propensityStats.refiAvg !== null ? S.propensityStats.refiAvg : '—', cls: 'blue' },
+    ] : []),
     { label: 'Updated', val: fmtDate(S.updatedAt) },
   ].map(c => `<div class="sum-cell"><div class="s-label">${c.label}</div><div class="s-val${c.cls ? ' ' + c.cls : ''}">${c.val}</div></div>`).join('');
 }
@@ -366,6 +370,25 @@ function copySQL() {
   setTimeout(() => btn.textContent = 'Copy SQL', 1500);
 }
 
+// ─── PROPENSITY HIGHLIGHTS ───────────────────────────────────────────────────
+function renderPropensityHighlights() {
+  const el = document.getElementById('propensity-highlights');
+  if (!el) return;
+  const p = S.propensityStats;
+  if (!p || !p.hasData) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  const fmt = v => v !== null ? v : '—';
+  const fmtN = v => v !== null ? Number(v).toLocaleString() : '—';
+  el.innerHTML = `
+    <div class="card-label" style="margin-bottom:10px;">Propensity scores (ZIP-level percentiles)</div>
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-val blue">${fmt(p.sellAvg)}</div><div class="stat-lbl">Avg sell propensity</div></div>
+      <div class="stat-card"><div class="stat-val blue">${fmt(p.refiAvg)}</div><div class="stat-lbl">Avg refi propensity</div></div>
+      <div class="stat-card"><div class="stat-val">${fmtN(p.sellHigh)}</div><div class="stat-lbl">High sell score (≥75th)</div></div>
+      <div class="stat-card"><div class="stat-val">${fmtN(p.refiHigh)}</div><div class="stat-lbl">High refi score (≥75th)</div></div>
+    </div>`;
+}
+
 // ─── STAGE 3: RAW OUTPUT ──────────────────────────────────────────────────────
 function parseCSV(text) {
   const lines = text.split('\n').filter(l => l.trim());
@@ -399,6 +422,16 @@ function processRaw() {
       const records = parseCSV(raw);
       S.rawRecords = records;
       S.rawCount = records.length;
+      const sellVals = records.map(r => parseFloat(r['PROPENSITY_SELL_PERCENTILE_ZIP'])).filter(v => !isNaN(v));
+      const refiVals = records.map(r => parseFloat(r['PROPENSITY_REFINANCE_PERCENTILE_ZIP'])).filter(v => !isNaN(v));
+      const avg = arr => arr.length ? (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1) : null;
+      S.propensityStats = {
+        sellAvg: avg(sellVals), refiAvg: avg(refiVals),
+        sellHigh: sellVals.length ? sellVals.filter(v => v >= 75).length : null,
+        refiHigh: refiVals.length ? refiVals.filter(v => v >= 75).length : null,
+        hasData: sellVals.length > 0 || refiVals.length > 0
+      };
+      renderPropensityHighlights();
       const q = v => `"${(v || '').replace(/"/g, '""')}"`;
       const lines = ['OWNER_NAME,ADDRESS,CITY,STATE,ZIPCODE'];
       records.forEach(r => lines.push([

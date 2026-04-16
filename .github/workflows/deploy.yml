@@ -1,0 +1,83 @@
+name: Deploy Lead Gen Pipeline
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  S3_BUCKET: barrett-leadgen
+  STACK_NAME: barrett-leadgen-pipeline
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - uses: aws-actions/setup-sam@v2
+
+      - name: Create S3 bucket if needed
+        run: |
+          aws s3 mb s3://$S3_BUCKET --region $AWS_REGION 2>/dev/null || true
+          aws s3 website s3://$S3_BUCKET \
+            --index-document index.html \
+            --error-document index.html
+          aws s3api put-bucket-policy --bucket $S3_BUCKET --policy '{
+            "Version": "2012-10-17",
+            "Statement": [{
+              "Sid": "PublicRead",
+              "Effect": "Allow",
+              "Principal": "*",
+              "Action": "s3:GetObject",
+              "Resource": "arn:aws:s3:::'"$S3_BUCKET"'/*"
+            }]
+          }'
+
+      - name: Build and deploy Lambda + API Gateway
+        run: |
+          cd leadgen
+          sam build
+          sam deploy \
+            --stack-name $STACK_NAME \
+            --s3-bucket $S3_BUCKET \
+            --s3-prefix sam-artifacts \
+            --region $AWS_REGION \
+            --capabilities CAPABILITY_IAM \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides \
+              ClaudeApiKey="${{ secrets.CLAUDE_API_KEY }}" \
+              AzureTenantId="${{ secrets.AZURE_TENANT_ID }}" \
+              AzureClientId="${{ secrets.AZURE_CLIENT_ID }}" \
+              AzureClientSecret="${{ secrets.AZURE_CLIENT_SECRET }}"
+
+      - name: Inject API URL and upload frontend
+        run: |
+          API_URL=$(aws cloudformation describe-stacks \
+            --stack-name $STACK_NAME \
+            --region $AWS_REGION \
+            --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" \
+            --output text)
+          echo "API URL: $API_URL"
+          sed -i "s|https://REPLACE_WITH_API_GATEWAY_URL|$API_URL|g" leadgen/frontend/app.js
+          aws s3 sync leadgen/frontend/ s3://$S3_BUCKET/ \
+            --region $AWS_REGION \
+            --cache-control "no-cache" \
+            --exclude ".DS_Store"
+          sed -i "s|$API_URL|https://REPLACE_WITH_API_GATEWAY_URL|g" leadgen/frontend/app.js
+
+      - name: Print site URL
+        run: echo "Site live at http://$S3_BUCKET.s3-website-$AWS_REGION.amazonaws.com"
