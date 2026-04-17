@@ -18,7 +18,7 @@ function claudeRequest(messages) {
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1000,
       system: `You are a Snowflake SQL expert for Barrett Financial. Given an existing SQL query and a change request, return ONLY the updated SQL query. No explanation, no markdown fences, no preamble.
-Preserve the existing style exactly: SELECT *, ILIKE with % wildcards, OR blocks in parentheses, numeric ranges with >= and <=, LIMIT 10000, and always keep AND NOT LIEN1_LENDER_NAME ILIKE '%BARRETT FINANCIAL GROUP%'.
+Preserve the existing style exactly: SELECT *, ILIKE with % wildcards, OR blocks in parentheses, numeric ranges with >= and <=, LIMIT 10000, and always keep AND NOT LIEN1_LENDER_NAME ILIKE '%BARRETT FINANCIAL GROUP%'. Never use IN (...) — always use ILIKE OR combos instead.
 Never remove PROPENSITY_SELL_PERCENTILE_ZIP or PROPENSITY_REFINANCE_PERCENTILE_ZIP from the output.`,
       messages
     });

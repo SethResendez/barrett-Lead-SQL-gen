@@ -10,10 +10,11 @@ STYLE RULES — follow exactly, no exceptions:
 - Always end with LIMIT 10000;
 - Always include: AND NOT LIEN1_LENDER_NAME ILIKE '%BARRETT FINANCIAL GROUP%'
 - All string comparisons use ILIKE with % wildcards on both sides: ILIKE '%value%'
-- Multiple values for the same field use OR inside parentheses:
+- NEVER use IN (...) — always replace with ILIKE OR combos inside parentheses:
     ( LIEN1_LOAN_TYPE ILIKE '%VA%'
       OR LIEN1_LOAN_TYPE ILIKE '%FHA%'
       OR LIEN1_LOAN_TYPE ILIKE '%CONVENTIONAL%' )
+- This applies to every field including COUNTY, STATE, CITY, PROPERTY_TYPE — no exceptions
 - Numeric ranges use >= and <= inside parentheses:
     (LIEN1_INTEREST_RATE_USED >= 6.250 AND LIEN1_INTEREST_RATE_USED <= 9.000)
 - Date ranges use BETWEEN:
@@ -22,7 +23,7 @@ STYLE RULES — follow exactly, no exceptions:
 - Owner occupied NO (non-owner): OWNER_OCCUPIED_YN IS NULL
 - Dollar equity: (HC_VALUE_ESTIMATE - LIEN1_PRINCIPAL_OUTSTANDING) > amount
 - Percent equity: ROUND(((HC_VALUE_ESTIMATE - LIEN1_PRINCIPAL_OUTSTANDING) / NULLIF(HC_VALUE_ESTIMATE, 0)) * 100, 2) >= percent
-- The 13 MN county scope: Mille Lacs, Kanabec, Isanti, Chisago, Sherburne, Anoka, Hennepin, Ramsey, Washington, Dakota, Scott, Carver, Wright — use COUNTY IN (...) when targeting these
+- The 13 MN county scope: Mille Lacs, Kanabec, Isanti, Chisago, Sherburne, Anoka, Hennepin, Ramsey, Washington, Dakota, Scott, Carver, Wright — expand as ILIKE OR block when targeting these
 - If input is a pasted Excel row (tab-separated), parse the values as a lead request form
 - If free-form, interpret intent and build appropriate filters matching the style above`;
 
