@@ -1,6 +1,10 @@
 const https = require('https');
 
-const SYSTEM_PROMPT = `You are a Snowflake SQL expert for Barrett Financial's HouseCanary property database.
+function buildSystemPrompt() {
+  const today = new Date().toISOString().slice(0, 10);
+  return `Today's date is ${today}. Use this to calculate all relative date ranges (e.g. "last 18 months", "past 2 years", "since Jan") exactly from today.
+
+You are a Snowflake SQL expert for Barrett Financial's HouseCanary property database.
 Table: BULK_PROPERTY_DATA_WITH_PROPENSITY_PRIVATE_SHARE_USA
 Key fields: HC_ADDRESS_ID, ADDRESS_SLUG, ADDRESS, CITY, STATE, ZIPCODE, COUNTY, HC_VALUE_ESTIMATE, PRINCIPAL_OUTSTANDING_TOTAL, LIEN_AMOUNT_TOTAL, PRINCIPAL_PAID_TOTAL, OWNER_OCCUPIED_YN, DEFAULT_YN, DEFAULT_DATE_LAST, HC_CONDITION_CLASS, BUILDING_CONDITION_CODE, LAST_CLOSE_DATE, LAST_CLOSE_PRICE, DEED_DATE, DEED_PRICE, LIEN1_LOAN_TYPE, LIEN1_AMOUNT, LIEN1_CONTRACT_DATE, LIEN1_LOAN_TERM, LIEN1_INTEREST_RATE_USED, LIEN1_LENDER_NAME, LIEN1_BORROWER1_NAME, LIEN1_BORROWER2_NAME, YEAR_BUILT, LIVING_AREA, LOT_SIZE, PROPERTY_TYPE, BEDROOMS, BATHROOMS_TOTAL, OWNER_NAME, PROPENSITY_SELL_PERCENTILE_ZIP, PROPENSITY_REFINANCE_PERCENTILE_ZIP
 
@@ -25,7 +29,7 @@ STYLE RULES — follow exactly, no exceptions:
 - Percent equity: ROUND(((HC_VALUE_ESTIMATE - LIEN1_PRINCIPAL_OUTSTANDING) / NULLIF(HC_VALUE_ESTIMATE, 0)) * 100, 2) >= percent
 - The 13 MN county scope: Mille Lacs, Kanabec, Isanti, Chisago, Sherburne, Anoka, Hennepin, Ramsey, Washington, Dakota, Scott, Carver, Wright — expand as ILIKE OR block when targeting these
 - If input is a pasted Excel row (tab-separated), parse the values as a lead request form
-- If free-form, interpret intent and build appropriate filters matching the style above`;
+- If free-form, interpret intent and build appropriate filters matching the style above`;};
 
 function ensurePropensityCols(sql) {
   const trimmed = sql.trim();
@@ -44,7 +48,7 @@ function claudeRequest(messages) {
     const body = JSON.stringify({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1000,
-      system: SYSTEM_PROMPT,
+      system: buildSystemPrompt(),
       messages
     });
     const options = {
