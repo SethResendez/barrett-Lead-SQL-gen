@@ -46,7 +46,7 @@ function ensurePropensityCols(sql) {
 function claudeRequest(messages) {
   return new Promise((resolve, reject) => {
     const body = JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 1000,
       system: buildSystemPrompt(),
       messages
@@ -66,8 +66,15 @@ function claudeRequest(messages) {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
-        try { resolve(JSON.parse(data)); }
-        catch (e) { reject(new Error('Parse error: ' + data)); }
+        let parsed;
+        try { parsed = JSON.parse(data); }
+        catch (e) { return reject(new Error(`Anthropic API returned non-JSON (HTTP ${res.statusCode}): ${data.slice(0, 500)}`)); }
+        // Surface API errors instead of silently producing blank SQL.
+        if (res.statusCode < 200 || res.statusCode >= 300 || parsed.type === 'error') {
+          const detail = parsed.error ? `${parsed.error.type}: ${parsed.error.message}` : JSON.stringify(parsed).slice(0, 500);
+          return reject(new Error(`Anthropic API error (HTTP ${res.statusCode}): ${detail}`));
+        }
+        resolve(parsed);
       });
     });
     req.on('error', reject);
@@ -90,7 +97,9 @@ exports.handler = async (event) => {
       ? `Generate SQL for this pasted Excel row request:\n\n${request}`
       : `Generate SQL for this lead list description:\n\n${request}`;
     const result = await claudeRequest([{ role: 'user', content: prompt }]);
-    const sql = ensurePropensityCols(result.content?.[0]?.text || '');
+    const text = result.content?.[0]?.text;
+    if (!text) throw new Error('Anthropic API returned no text content: ' + JSON.stringify(result).slice(0, 300));
+    const sql = ensurePropensityCols(text);
     return { statusCode: 200, headers, body: JSON.stringify({ sql }) };
   } catch (e) {
     return { statusCode: 500, headers, body: JSON.stringify({ error: e.message }) };
